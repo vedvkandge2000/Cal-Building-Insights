@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>California Building Insights - Interactive Dashboard</title>
+  <link rel="stylesheet" href="index.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.1.0",
+    "chart.js": "https://esm.sh/chart.js@^4.4.9",
+    "react/": "https://esm.sh/react@^19.1.0/"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="app-container">
+    <header>
+      <h1><i class="fas fa-building-columns"></i> California Building Energy & Environmental Insights</h1>
+      <div class="header-controls">
+        <button id="toggle-filters" class="btn-primary">
+          <i class="fas fa-filter"></i> Filters
+        </button>
+        <button id="toggle-comparison" class="btn-secondary">
+          <i class="fas fa-balance-scale"></i> Compare
+        </button>
+        <button id="export-data" class="btn-secondary">
+          <i class="fas fa-download"></i> Export
+        </button>
+      </div>
+    </header>
+    
+    <div id="main-layout">
+      <!-- Enhanced Navigation Panel -->
+      <nav id="navigation-panel">
+        <h2><i class="fas fa-book-open"></i> Story Chapters</h2>
+        <ul>
+          <li><button data-view="overview" class="nav-button active"><i class="fas fa-tachometer-alt"></i> Overview</button></li>
+          <li><button data-view="energyConsumption" class="nav-button"><i class="fas fa-bolt"></i> Energy Consumption</button></li>
+          <li><button data-view="greenPower" class="nav-button"><i class="fas fa-leaf"></i> Green Power</button></li>
+          <li><button data-view="waterUsage" class="nav-button"><i class="fas fa-tint"></i> Water Usage</button></li>
+          <li><button data-view="geographicFootprint" class="nav-button"><i class="fas fa-map-marked-alt"></i> Geographic Footprint</button></li>
+          <li><button data-view="buildingAge" class="nav-button"><i class="fas fa-history"></i> Building Age</button></li>
+        </ul>
+        
+        <!-- Quick Stats Panel -->
+        <div class="quick-stats">
+          <h3><i class="fas fa-chart-bar"></i> Quick Stats</h3>
+          <div id="filter-status" class="stat-display">
+            Loading data...
+          </div>
+          <div class="stat-grid">
+            <div class="stat-item">
+              <span class="stat-label">Total Properties</span>
+              <span class="stat-value" id="total-properties">-</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Avg Energy Use</span>
+              <span class="stat-value" id="avg-energy">-</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Green Buildings</span>
+              <span class="stat-value" id="green-buildings">-</span>
+            </div>
+          </div>
+        </div>
+      </nav>
+      
+      <!-- Interactive Filters Panel -->
+      <aside id="filters-panel" class="filters-panel collapsed">
+        <div class="filters-header">
+          <h3><i class="fas fa-filter"></i> Interactive Filters</h3>
+          <button id="close-filters" class="close-btn">×</button>
+        </div>
+        
+        <div class="filters-content">
+          <!-- Search Filter -->
+          <div class="filter-group">
+            <label for="search-input">
+              <i class="fas fa-search"></i> Search Buildings
+            </label>
+            <input type="text" id="search-input" placeholder="Search by name, address, or department..." />
+          </div>
+          
+          <!-- Department Filter -->
+          <div class="filter-group">
+            <label>
+              <i class="fas fa-building"></i> Departments
+              <button class="expand-btn" data-target="dept-filter">
+                <i class="fas fa-chevron-down"></i>
+              </button>
+            </label>
+            <div id="dept-filter" class="filter-options collapsed">
+              <div class="filter-search">
+                <input type="text" placeholder="Search departments..." id="dept-search">
+              </div>
+              <div class="checkbox-group" id="dept-checkboxes">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+          </div>
+          
+          <!-- Property Type Filter -->
+          <div class="filter-group">
+            <label>
+              <i class="fas fa-home"></i> Property Types
+              <button class="expand-btn" data-target="type-filter">
+                <i class="fas fa-chevron-down"></i>
+              </button>
+            </label>
+            <div id="type-filter" class="filter-options collapsed">
+              <div class="checkbox-group" id="type-checkboxes">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+          </div>
+          
+          <!-- Range Filters -->
+          <div class="filter-group">
+            <label><i class="fas fa-calendar"></i> Year Built Range</label>
+            <div class="range-input">
+              <input type="number" id="year-min" placeholder="From" min="1800" max="2025">
+              <span>to</span>
+              <input type="number" id="year-max" placeholder="To" min="1800" max="2025">
+            </div>
+          </div>
+          
+          <div class="filter-group">
+            <label><i class="fas fa-bolt"></i> Energy Use Range (kBtu)</label>
+            <div class="range-input">
+              <input type="number" id="energy-min" placeholder="Minimum">
+              <span>to</span>
+              <input type="number" id="energy-max" placeholder="Maximum">
+            </div>
+          </div>
+          
+          <div class="filter-group">
+            <label><i class="fas fa-expand-arrows-alt"></i> Floor Area Range (sq ft)</label>
+            <div class="range-input">
+              <input type="number" id="gfa-min" placeholder="Minimum">
+              <span>to</span>
+              <input type="number" id="gfa-max" placeholder="Maximum">
+            </div>
+          </div>
+          
+          <!-- LEED Certification Filter -->
+          <div class="filter-group">
+            <label><i class="fas fa-leaf"></i> LEED Certification</label>
+            <select id="leed-filter">
+              <option value="">All Buildings</option>
+              <option value="certified">LEED Certified</option>
+              <option value="not-certified">Not LEED Certified</option>
+            </select>
+          </div>
+          
+          <!-- City Filter -->
+          <div class="filter-group">
+            <label><i class="fas fa-city"></i> City</label>
+            <select id="city-filter">
+              <option value="">All Cities</option>
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+        </div>
+        
+        <div class="filters-footer">
+          <button id="apply-filters" class="btn-primary">Apply Filters</button>
+          <button id="reset-filters" class="btn-secondary">Reset All</button>
+        </div>
+        
+        <!-- Active Filters Display -->
+        <div class="active-filters-section">
+          <h4>Active Filters</h4>
+          <div id="active-filters" class="active-filters">
+            <!-- Filter chips will be added here -->
+          </div>
+        </div>
+      </aside>
+      
+      <!-- Main Visualization Area -->
+      <main id="visualization-area">
+        <div id="loader" class="loader-container" style="display: none;">
+          <div class="loader"></div>
+          <p>Loading Data...</p>
+        </div>
+        
+        <!-- Visualization Controls Bar -->
+        <div id="viz-controls" class="viz-controls">
+          <div class="control-group">
+            <button id="fullscreen-btn" class="btn-icon" title="Toggle Fullscreen">
+              <i class="fas fa-expand"></i>
+            </button>
+            <button id="zoom-reset" class="btn-icon" title="Reset Zoom">
+              <i class="fas fa-search-minus"></i>
+            </button>
+            <button id="screenshot-btn" class="btn-icon" title="Take Screenshot">
+              <i class="fas fa-camera"></i>
+            </button>
+          </div>
+          
+          <div class="view-options">
+            <label>
+              <input type="checkbox" id="show-animations"> Animations
+            </label>
+            <label>
+              <input type="checkbox" id="dark-mode"> Dark Mode
+            </label>
+          </div>
+        </div>
+        
+        <div id="visualization-content">
+          <!-- Charts will be rendered here -->
+        </div>
+      </main>
+      
+      <!-- Comparison Panel -->
+      <aside id="comparison-panel" class="comparison-panel collapsed">
+        <div class="comparison-header">
+          <h3><i class="fas fa-balance-scale"></i> Building Comparison</h3>
+          <button id="close-comparison" class="close-btn">×</button>
+        </div>
+        <div class="comparison-content">
+          <div id="comparison-items">
+            <!-- Comparison items will be added here -->
+          </div>
+          <div class="comparison-actions">
+            <button id="compare-buildings" class="btn-primary">Compare Selected</button>
+            <button id="clear-comparison" class="btn-secondary">Clear All</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+    
+    <!-- Export Modal -->
+    <div id="export-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Export Data</h3>
+          <button class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="export-options">
+            <h4>Export Format</h4>
+            <label><input type="radio" name="export-format" value="csv" checked> CSV</label>
+            <label><input type="radio" name="export-format" value="json"> JSON</label>
+          </div>
+          <div class="export-scope">
+            <h4>Data Scope</h4>
+            <label><input type="radio" name="export-scope" value="filtered" checked> Filtered Data</label>
+            <label><input type="radio" name="export-scope" value="all"> All Data</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="confirm-export" class="btn-primary">Export</button>
+          <button class="modal-close btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script type="module" src="index.tsx"></script>
+</body>
+</html>
