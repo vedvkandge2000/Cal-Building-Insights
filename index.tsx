@@ -5,10 +5,11 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { Chart, ChartConfiguration, registerables, TooltipItem, InteractionItem } from 'chart.js';
 import zoomPlugin from 'chartjs-plugin-zoom';
+import { MatrixController, MatrixElement } from 'chartjs-chart-matrix';
+Chart.register(...registerables, zoomPlugin, MatrixController, MatrixElement);
 
-Chart.register(...registerables, zoomPlugin);
-
-const API_KEY = process.env.API_KEY || process.env.GEMINI_API_KEY || '';
+// const API_KEY = process.env.API_KEY || process.env.GEMINI_API_KEY || '';
+const API_KEY = "AIzaSyA7bElTLF7QedVT74_CF7Hz4iLYBLn0tZQ";
 const GEMINI_MODEL_NAME = "gemini-2.5-flash-preview-04-17";
 
 // Enhanced interfaces for interactivity
@@ -61,6 +62,8 @@ interface BuildingData {
   greenPowerKbtu: number;
   percentEnergyFromGreen: number;
   gfaMissing: number;
+  lat: number;      // <-- Add this line
+  lng: number;  
 }
 
 let allBuildingData: BuildingData[] = [];
@@ -99,7 +102,7 @@ function getNumericValue(value: string | number | undefined): number {
 
 async function fetchDataAndParse(): Promise<BuildingData[]> {
   try {
-    const response = await fetch('data.json'); 
+    const response = await fetch('data_with_coords.json'); 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -136,6 +139,9 @@ async function fetchDataAndParse(): Promise<BuildingData[]> {
         greenPowerKbtu: getNumericValue(item.greenPowerKbtu),
         percentEnergyFromGreen: getNumericValue(item.percentEnergyFromGreen),
         gfaMissing: getNumericValue(item.gfaMissing),
+        lat: item.lat ? (typeof item.lat === "string" ? parseFloat(item.lat) : item.lat) : 0,
+        lng: item.lng ? (typeof item.lng === "string" ? parseFloat(item.lng) : item.lng) : 0
+
       }));
     } else {
       throw new Error('Invalid JSON data format - expected an array');
@@ -147,6 +153,96 @@ async function fetchDataAndParse(): Promise<BuildingData[]> {
     return [];
   }
 }
+
+// @ts-ignore
+declare const L: any;
+
+// Helper: group data by city and sum/average energy
+function getCityAggregates(buildings: BuildingData[]) {
+  const cityAgg: Record<string, { lat: number; lng: number; totalEnergy: number; count: number }> = {};
+  buildings.forEach(b => {
+    if (!b.city || !b.lat || !b.lng) return;
+    const city = b.city.trim();
+    const lat = typeof b.lat === "string" ? parseFloat(b.lat) : b.lat;
+    const lng = typeof b.lng === "string" ? parseFloat(b.lng) : b.lng;
+    if (!lat || !lng) return;
+
+    if (!cityAgg[city]) cityAgg[city] = { lat, lng, totalEnergy: 0, count: 0 };
+    cityAgg[city].totalEnergy += Number(b.siteEnergyUseKbtu) || 0;
+    cityAgg[city].count++;
+  });
+  return Object.entries(cityAgg).map(([city, val]) => ({
+    city,
+    lat: val.lat,
+    lng: val.lng,
+    totalEnergy: val.totalEnergy,
+    avgEnergy: val.totalEnergy / val.count,
+    count: val.count,
+  }));
+}
+
+// Helper: color scale (blue=low, red=high)
+function getHeatColor(val: number, min: number, max: number): string {
+  const pct = (val - min) / (max - min || 1);
+  const r = Math.round(60 + 195 * pct);
+  const g = Math.round(170 - 110 * pct);
+  const b = Math.round(250 - 200 * pct);
+  return `rgb(${r},${g},${b})`;
+}
+
+export function renderCaliforniaCityEnergyMap(buildings: BuildingData[], type: 'total' | 'avg' = 'total') {
+  const mapContainer = document.getElementById('city-energy-map');
+  if (!mapContainer) return;
+
+  // Remove previous map if any
+  if ((window as any).leafletMapInstance) {
+    (window as any).leafletMapInstance.remove();
+    (window as any).leafletMapInstance = null;
+  }
+
+  mapContainer.innerHTML = "";
+
+  const cityPoints = getCityAggregates(buildings);
+
+  // Use total or average energy
+  const valueKey = type === 'avg' ? 'avgEnergy' : 'totalEnergy';
+
+  const minVal = Math.min(...cityPoints.map(pt => pt[valueKey]));
+  const maxVal = Math.max(...cityPoints.map(pt => pt[valueKey]));
+
+  // Center on California
+  const map = L.map('city-energy-map').setView([37.5, -119.5], 6);
+  (window as any).leafletMapInstance = map;
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 11,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  // Draw large, transparent circles for each city
+  cityPoints.forEach(pt => {
+    L.circle([pt.lat, pt.lng], {
+      radius: 18000 + 22000 * (pt[valueKey] - minVal) / (maxVal - minVal || 1),
+      color: getHeatColor(pt[valueKey], minVal, maxVal),
+      fillColor: getHeatColor(pt[valueKey], minVal, maxVal),
+      fillOpacity: 0.45,
+      weight: 1
+    })
+      .addTo(map)
+      .bindTooltip(
+        `<b>${pt.city}</b><br>
+         <b>Properties:</b> ${pt.count}<br>
+         <b>${type === 'avg' ? 'Avg' : 'Total'} Energy:</b> ${Math.round(pt[valueKey]).toLocaleString()} kBtu`,
+        { direction: "top", offset: [0, -8] }
+      );
+  });
+}
+
+
+
+
+
+
 
 function destroyActiveCharts(): void {
   activeCharts.forEach(chart => {
@@ -207,7 +303,7 @@ function renderChart(canvasId: string, config: ChartConfiguration): Chart {
             },
             scaleMode: 'xy',
           },
-        },
+        }as any,
         tooltip: {
           ...config.options?.plugins?.tooltip,
           backgroundColor: 'rgba(0, 0, 0, 0.9)',
@@ -606,7 +702,7 @@ async function generateAndDisplayStory(visualizationTitle: string, chartDescript
     });
     const story = response.text;
     const storyP = document.createElement('p');
-    storyP.textContent = story;
+    storyP.textContent = story ?? '';
     if (loader) loader.style.display = 'none'; // Hide loader before adding text
     storyContainer.appendChild(storyP);
 
@@ -940,6 +1036,15 @@ function renderEnergyConsumptionCharts(data: BuildingData[], vizArea: HTMLElemen
     options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { y: { ticks: { autoSkip: false, font: {size: 9} } } } }
   });
   generateAndDisplayStory('Top Energy Consumers', 'A horizontal bar chart showing the top 10 properties by Site Energy Use (kBtu).', topEnergyStoryId);
+  const mapSection = document.createElement("section");
+mapSection.innerHTML = `
+  <h2 style="text-align:center;margin-top:30px;">California Building Energy Consumption by City</h2>
+  <div style="display: flex; justify-content: center;">
+    <div id="city-energy-map" style="width: 1000px; height: 540px; border-radius: 10px; margin: 20px 0;"></div>
+  </div>
+`;
+vizArea.appendChild(mapSection);
+renderCaliforniaCityEnergyMap(filteredBuildingData, 'total');
 }
 
 function renderGreenPowerCharts(data: BuildingData[], vizArea: HTMLElement) {
@@ -1338,7 +1443,7 @@ async function initializeApp() {
     // Initialize AI with graceful fallback
     if (API_KEY) {
       try {
-        ai = new GoogleGenAI(API_KEY);
+        ai = new GoogleGenAI({ apiKey: API_KEY });
         console.log("Gemini AI initialized successfully");
       } catch (aiError) {
         console.warn("Failed to initialize Gemini AI, story generation will be disabled:", aiError);
@@ -1357,6 +1462,18 @@ async function initializeApp() {
     
     filteredBuildingData = [...allBuildingData]; // Initialize filtered data
     console.log(`Loaded ${allBuildingData.length} building records.`);
+    console.log('filteredBuildingData', filteredBuildingData);
+  //   fetch('data_with_coords.json')
+  // .then(res => res.json())
+  // .then(data => {
+  //   console.log('First 3 buildings:', data.slice(0,3));
+  //   renderCaliforniaCityEnergyMap(filteredBuildingData, 'total');
+
+  // });
+
+
+
+
     
     // Initialize UI components with error handling
     try {
@@ -1401,11 +1518,17 @@ async function initializeApp() {
   } catch (error) {
     console.error("Failed to initialize app:", error);
     const vizContent = document.getElementById('visualization-content');
+    let errorMessage = "Unknown error";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === "string") {
+      errorMessage = error;
+    } 
     if (vizContent) {
       vizContent.innerHTML = `
         <div class="error-message">
           <h3>Failed to load the application</h3>
-          <p>Error: ${error.message}</p>
+          <p>Error: ${errorMessage}</p>
           <p>Please check the console for more details and ensure:</p>
           <ul>
             <li>The 'data.json' file exists in the project root</li>
@@ -1417,6 +1540,7 @@ async function initializeApp() {
       `;
     }
   }
+  
 }
 
 function initializeFilters(): void {
@@ -1539,16 +1663,24 @@ function initializeEventHandlers(): void {
   
   // Expand/collapse filter sections
   document.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    if (target.classList.contains('expand-btn') || target.closest('.expand-btn')) {
-      const btn = target.classList.contains('expand-btn') ? target : target.closest('.expand-btn')!;
-      const targetId = btn.dataset.target!;
-      const targetElement = document.getElementById(targetId)!;
-      
-      btn.classList.toggle('expanded');
-      targetElement.classList.toggle('collapsed');
+  const target = e.target as HTMLElement;
+
+  // Try to find the closest .expand-btn (including the target itself)
+  const btn = target.classList.contains('expand-btn') 
+    ? target 
+    : target.closest('.expand-btn');
+
+    if (btn && btn instanceof HTMLElement && btn.dataset.target) {
+      const targetId = btn.dataset.target;
+      const targetElement = document.getElementById(targetId);
+
+      if (targetElement) {
+        btn.classList.toggle('expanded');
+        targetElement.classList.toggle('collapsed');
+      }
     }
   });
+
   
   // Visualization controls
   document.getElementById('fullscreen-btn')?.addEventListener('click', toggleFullscreen);
