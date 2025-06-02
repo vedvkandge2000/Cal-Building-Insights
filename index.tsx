@@ -1035,15 +1035,15 @@ function renderEnergyConsumptionCharts(data: BuildingData[], vizArea: HTMLElemen
     options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { y: { ticks: { autoSkip: false, font: {size: 9} } } } }
   });
   generateAndDisplayStory('Top Energy Consumers', 'A horizontal bar chart showing the top 10 properties by Site Energy Use (kBtu).', topEnergyStoryId);
-  const mapSection = document.createElement("section");
-mapSection.innerHTML = `
-  <h2 style="text-align:center;margin-top:30px;">California Building Energy Consumption by City</h2>
-  <div style="display: flex; justify-content: center;">
-    <div id="city-energy-map" style="width: 1000px; height: 540px; border-radius: 10px; margin: 20px 0;"></div>
-  </div>
-`;
-vizArea.appendChild(mapSection);
-renderCaliforniaCityEnergyMap(filteredBuildingData, 'total');
+//   const mapSection = document.createElement("section");
+// mapSection.innerHTML = `
+//   <h2 style="text-align:center;margin-top:30px;">California Building Energy Consumption by City</h2>
+//   <div style="display: flex; justify-content: center;">
+//     <div id="city-energy-map" style="width: 1000px; height: 540px; border-radius: 10px; margin: 20px 0;"></div>
+//   </div>
+// `;
+// vizArea.appendChild(mapSection);
+// renderCaliforniaCityEnergyMap(filteredBuildingData, 'total');
 }
 
 function renderGreenPowerCharts(data: BuildingData[], vizArea: HTMLElement) {
