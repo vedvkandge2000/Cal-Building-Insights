@@ -274,7 +274,7 @@ function renderChart(canvasId: string, config: ChartConfiguration): Chart {
       maintainAspectRatio: false,
       interaction: {
         intersect: false,
-        mode: 'index',
+        mode: 'nearest',
       },
       plugins: {
         ...config.options?.plugins,
@@ -286,7 +286,7 @@ function renderChart(canvasId: string, config: ChartConfiguration): Chart {
           },
           zoom: {
             wheel: {
-              enabled: true,
+              enabled: false,
             },
             pinch: {
               enabled: true,
@@ -651,8 +651,23 @@ function createVisualizationContainer(id: string, title: string): { vizDiv: HTML
 
   const chartContainer = document.createElement('div');
   chartContainer.className = 'chart-container';
+
   const canvasId = `chart-${id}`;
-  chartContainer.innerHTML = `<canvas id="${canvasId}" aria-label="${title} Chart" role="img"></canvas>`;
+chartContainer.innerHTML = `
+  <canvas id="${canvasId}" aria-label="${title} Chart" role="img"></canvas>
+  <div class="chart-zoom-controls">
+    <button class="btn-icon-circle btn-zoom-in" data-chart="${canvasId}" title="Zoom In">
+      <i class="fas fa-search-plus"></i>
+    </button>
+    <button class="btn-icon-circle btn-zoom-out" data-chart="${canvasId}" title="Zoom Out">
+      <i class="fas fa-search-minus"></i>
+    </button>
+    <button class="btn-icon-circle btn-zoom-reset" data-chart="${canvasId}" title="Reset Zoom">
+      <i class="fas fa-sync-alt"></i>
+    </button>
+  </div>
+`;
+
   vizDiv.appendChild(chartContainer);
 
   const storyContainerId = `story-${id}`;
@@ -664,6 +679,7 @@ function createVisualizationContainer(id: string, title: string): { vizDiv: HTML
 
   return { vizDiv, canvasId, storyContainerId };
 }
+
 
 async function generateAndDisplayStory(visualizationTitle: string, chartDescription: string, storyContainerId: string) {
   const storyContainer = document.getElementById(storyContainerId);
@@ -1777,6 +1793,26 @@ function initializeEventHandlers(): void {
     currentFilters.selectedCity = (e.target as HTMLSelectElement).value || null;
     updateFilteredData();
   });
+
+document.addEventListener('click', (e) => {
+  const target = (e.target as HTMLElement).closest('button');
+  if (!target) return;
+
+  const chartId = target.getAttribute('data-chart');
+  if (!chartId) return;
+
+  const chart = activeCharts.find(c => c.canvas.id === chartId);
+  if (!chart) return;
+
+  if (target.classList.contains('btn-zoom-in')) {
+    (chart as any).zoom(1.2);
+  } else if (target.classList.contains('btn-zoom-out')) {
+    (chart as any).zoom(0.8);
+  } else if (target.classList.contains('btn-zoom-reset')) {
+    (chart as any).resetZoom();
+  }
+});
+
   
   // Checkbox filters
   document.addEventListener('change', (e) => {

@@ -29,6 +29,12 @@ body {
   align-items: flex-start;
   min-height: 100vh;
   padding: 1rem;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body.dark-mode {
+  background: #1a1a1a !important;
+  color: #e9ecef !important;
 }
 
 #app-container {
@@ -763,27 +769,171 @@ header h1 {
 }
 
 /* Dark Mode Support */
+/* Dark Mode Complete Theme */
+
+/* General text */
+/* === DARK MODE STYLES === */
 .dark-mode {
-  background: #1a1a1a;
+  background-color: #1a1a1a;
   color: #e9ecef;
 }
 
+.dark-mode h1,
+.dark-mode h2,
+.dark-mode h3,
+.dark-mode h4,
+.dark-mode p,
+.dark-mode label,
+.dark-mode span,
+.dark-mode .nav-button,
+.dark-mode .stat-label,
+.dark-mode .stat-value {
+  color: #007bff !important;
+}
+
+.dark-mode .btn-primary,
+.dark-mode .btn-secondary,
+.dark-mode .btn-sm,
+.dark-mode .nav-button {
+  color: #ffffff;
+  background-color: #333;
+  border-color: #555;
+}
+
+.dark-mode .btn-primary:hover,
+.dark-mode .btn-secondary:hover,
+.dark-mode .btn-sm:hover,
+.dark-mode .nav-button:hover {
+  background-color: #444;
+  border-color: #777;
+  color: #fff;
+}
+
+.dark-mode .nav-button.active {
+  background-color: #007bff;
+  color: white;
+}
+
+.dark-mode header {
+  background: #000 !important;
+}
+
+.dark-mode #navigation-panel,
 .dark-mode .filters-panel,
 .dark-mode .comparison-panel,
-.dark-mode #navigation-panel {
-  background: #2d3748;
-  border-color: #4a5568;
-}
-
 .dark-mode .modal-content,
 .dark-mode .drill-down-panel {
-  background: #2d3748;
+  background-color: #2d3748;
   color: #e9ecef;
+  border-color: #4a5568;
 }
 
 .dark-mode .visualization-container {
-  background: #2d3748;
-  border-color: #4a5568;
+  background-color: #2a2a2a;
+  color: #e9ecef;
+  border-color: #444;
+}
+
+.dark-mode .visualization-container h3,
+.dark-mode .chart-info {
+  color: #f1f1f1;
+}
+
+.dark-mode .chartjs-legend li span {
+  background-color: white;
+}
+
+.dark-mode input,
+.dark-mode select,
+.dark-mode textarea {
+  background-color: #2c2c2c;
+  color: #e9ecef;
+  border: 1px solid #555;
+}
+
+.dark-mode input::placeholder {
+  color: #aaa;
+}
+
+.dark-mode .modal-header,
+.dark-mode .modal-body,
+.dark-mode .modal-footer {
+  background-color: #2d3748;
+  color: #e9ecef;
+}
+
+.dark-mode .filter-chip {
+  background: #007bff;
+  color: white;
+}
+
+.dark-mode .tooltip-custom {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.dark-mode .quick-stats h3 {
+  color: #ffffff;
+}
+
+.dark-mode .filter-group label i,
+.dark-mode .expand-btn {
+  color: #aaa;
+}
+.dark-mode .btn-icon-circle {
+  background-color: #4fd1c5;
+  color: #1a1a1a;
+}
+
+.dark-mode .btn-icon-circle:hover {
+  background-color: #38b2ac;
+}
+
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  gap: 12px;
+  font-size: 1rem;
+  color: #007bff;
+  user-select: none;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: relative;
+  width: 50px;
+  height: 26px;
+  background-color: #007bff;
+  border-radius: 34px;
+  transition: 0.4s;
+}
+
+.slider::before {
+  content: "";
+  position: absolute;
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  top: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.4s;
+}
+
+/* Toggle ON */
+input:checked + .slider {
+  background-color: #4a5568;
+}
+
+input:checked + .slider::before {
+  transform: translateX(24px);
 }
 
 /* Animation Classes */
@@ -1189,6 +1339,46 @@ select:focus {
 .zoom-feedback {
   animation: slideInFromRight 0.3s ease-out;
 }
+
+.chart-zoom-controls {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.chart-zoom-controls .btn-icon-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.chart-zoom-controls .btn-icon-circle:hover {
+  background-color: #0056b3;
+}
+
+.chart-zoom-controls button:hover {
+  background-color: #0056b3;
+}
+
+.chart-zoom-controls button.btn-zoom-reset {
+  background-color: #6c757d;
+}
+
+.chart-zoom-controls button.btn-zoom-reset:hover {
+  background-color: #5a6268;
+}
+
+
 
 @keyframes slideInFromRight {
   from {
