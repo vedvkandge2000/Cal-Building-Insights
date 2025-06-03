@@ -8,7 +8,7 @@ import zoomPlugin from 'chartjs-plugin-zoom';
 import { MatrixController, MatrixElement } from 'chartjs-chart-matrix';
 Chart.register(...registerables, zoomPlugin, MatrixController, MatrixElement);
 
-const API_KEY = 'AIzaSyD1TG8gV0cQhROeE6wzvShDQTYi4yFxJek';
+const API_KEY = '';
 const GEMINI_MODEL_NAME = "gemini-2.5-flash-preview-04-17";
 
 // Enhanced interfaces for interactivity
