@@ -1340,46 +1340,87 @@ function renderEfficiencyAnalysis(data: BuildingData[], vizArea: HTMLElement) {
     });
   }
 
-  const { vizDiv: energyIntensityVizDiv, canvasId: energyIntensityCanvasId, storyContainerId: energyIntensityStoryId } = 
-    createVisualizationContainer('energyIntensityDistribution', 'Energy Intensity Distribution (kBtu/sq ft)');
-  vizArea.appendChild(energyIntensityVizDiv);
-  
-  renderChart(energyIntensityCanvasId, {
-    type: 'bar',
-    data: {
-      labels: Object.keys(energyIntensityBins),
-      datasets: [{
-        label: 'Number of Properties',
-        data: Object.values(energyIntensityBins),
-        backgroundColor: 'rgba(255, 99, 132, 0.7)',
-        borderColor: 'rgba(255, 99, 132, 1)',
-        borderWidth: 1,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        x: {
-          title: { display: true, text: 'Energy Intensity (kBtu/sq ft)' },
-          ticks: { maxRotation: 45, font: { size: 9 } }
-        },
-        y: {
-          title: { display: true, text: 'Number of Properties' },
-          beginAtZero: true
+  const { vizDiv: energyIntensityVizDiv, canvasId: energyIntensityCanvasId, storyContainerId: energyIntensityStoryId } =
+  createVisualizationContainer('energyIntensityDistribution', 'Energy Intensity Distribution (kBtu/sq ft)');
+vizArea.appendChild(energyIntensityVizDiv);
+
+// --- Create Logarithmic toggle, add above chart ---
+const energyLogToggleDiv = document.createElement('div');
+energyLogToggleDiv.style.margin = '0.5rem 0';
+
+const energyLogToggle = document.createElement('input');
+energyLogToggle.type = 'checkbox';
+energyLogToggle.id = 'energyLogToggle';
+
+const energyLogLabel = document.createElement('label');
+energyLogLabel.htmlFor = 'energyLogToggle';
+energyLogLabel.style.marginLeft = '0.25rem';
+energyLogLabel.innerText = 'Logarithmic Y-Axis';
+
+energyLogToggleDiv.appendChild(energyLogToggle);
+energyLogToggleDiv.appendChild(energyLogLabel);
+energyIntensityVizDiv.prepend(energyLogToggleDiv);
+
+// --- Chart.js config object (reuse for toggling) ---
+const energyIntensityConfig: ChartConfiguration<'bar'> = {
+  type: 'bar',
+  data: {
+    labels: Object.keys(energyIntensityBins),
+    datasets: [{
+      label: 'Number of Properties',
+      data: Object.values(energyIntensityBins),
+      backgroundColor: 'rgba(255, 99, 132, 0.7)',
+      borderColor: 'rgba(255, 99, 132, 1)',
+      borderWidth: 0,
+      minBarLength: 6
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      tooltip: {
+        displayColors: false,
+        callbacks: {
+          afterBody: function(context: any) {
+            return 'Lower values indicate more energy-efficient buildings';
+          }
         }
+      }
+    },
+    scales: {
+      x: {
+        title: { display: true, text: 'Energy Intensity (kBtu/sq ft)' },
+        ticks: { maxRotation: 45, font: { size: 9 } }
       },
-      plugins: {
-        tooltip: {
-          callbacks: {
-            afterBody: function(context: any) {
-              return 'Lower values indicate more energy-efficient buildings';
-            }
+      y: {
+        type: 'linear',
+        min: 1,
+        title: { display: true, text: 'Number of Properties' },
+        ticks: {
+          callback: function(value: string | number) {
+            // Typescript-friendly tick formatting
+            if (typeof value === 'number') return value.toLocaleString();
+            return value;
           }
         }
       }
     }
-  });
+  }
+};
+
+// --- Render the chart and store reference ---
+const energyIntensityChart = renderChart(energyIntensityCanvasId, energyIntensityConfig);
+
+// --- Toggle handler (no redeclaration) ---
+energyLogToggle.addEventListener('change', function () {
+  if (!energyIntensityChart.options.scales || !energyIntensityChart.options.scales.y) return;
+  const isLog = energyLogToggle.checked;
+  energyIntensityChart.options.scales.y.type = isLog ? 'logarithmic' : 'linear';
+  energyIntensityChart.options.scales.y.min = isLog ? 1 : 0;
+  energyIntensityChart.update();
+});
+
   generateAndDisplayStory('Energy Efficiency Distribution', 'Distribution of energy intensity (kBtu per square foot) across buildings. Lower values indicate more energy-efficient properties.', energyIntensityStoryId);
 
   // 2. Water Efficiency vs Energy Efficiency Scatter Plot
