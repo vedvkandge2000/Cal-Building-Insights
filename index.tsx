@@ -8,7 +8,7 @@ import zoomPlugin from 'chartjs-plugin-zoom';
 import { MatrixController, MatrixElement } from 'chartjs-chart-matrix';
 Chart.register(...registerables, zoomPlugin, MatrixController, MatrixElement);
 
-const API_KEY = process.env.API_KEY || process.env.GEMINI_API_KEY || '';
+const API_KEY = 'AIzaSyD1TG8gV0cQhROeE6wzvShDQTYi4yFxJek';
 const GEMINI_MODEL_NAME = "gemini-2.5-flash-preview-04-17";
 
 // Enhanced interfaces for interactivity
@@ -56,13 +56,10 @@ interface BuildingData {
   leedCertified: string;
   location: string;
   totalElectricityUseKWh: number;
-  onsiteRenewableFraction: number;
-  totalFossilFuelEnergyKbtu: number;
-  greenPowerKbtu: number;
-  percentEnergyFromGreen: number;
-  gfaMissing: number;
-  lat: number;      // <-- Add this line
-  lng: number;  
+  elecUsedPerSqrFt: number;
+  siteEnergyUsedPerSqrFt: number;
+  waterUsedPerSqrFt: number;
+  hasRenewable: number;
 }
 
 let allBuildingData: BuildingData[] = [];
@@ -101,7 +98,7 @@ function getNumericValue(value: string | number | undefined): number {
 
 async function fetchDataAndParse(): Promise<BuildingData[]> {
   try {
-    const response = await fetch('data_with_coords.json'); 
+    const response = await fetch('dataUpdated.json'); 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -133,14 +130,10 @@ async function fetchDataAndParse(): Promise<BuildingData[]> {
         leedCertified: item.leedCertified || "",
         location: item.location || "",
         totalElectricityUseKWh: getNumericValue(item.totalElectricityUseKWh),
-        onsiteRenewableFraction: getNumericValue(item.onsiteRenewableFraction),
-        totalFossilFuelEnergyKbtu: getNumericValue(item.totalFossilFuelEnergyKbtu),
-        greenPowerKbtu: getNumericValue(item.greenPowerKbtu),
-        percentEnergyFromGreen: getNumericValue(item.percentEnergyFromGreen),
-        gfaMissing: getNumericValue(item.gfaMissing),
-        lat: item.lat ? (typeof item.lat === "string" ? parseFloat(item.lat) : item.lat) : 0,
-        lng: item.lng ? (typeof item.lng === "string" ? parseFloat(item.lng) : item.lng) : 0
-
+        elecUsedPerSqrFt: getNumericValue(item.elecUsedPerSqrFt),
+        siteEnergyUsedPerSqrFt: getNumericValue(item.siteEnergyUsedPerSqrFt),
+        waterUsedPerSqrFt: getNumericValue(item.waterUsedPerSqrFt),
+        hasRenewable: getNumericValue(item.hasRenewable),
       }));
     } else {
       throw new Error('Invalid JSON data format - expected an array');
@@ -152,96 +145,6 @@ async function fetchDataAndParse(): Promise<BuildingData[]> {
     return [];
   }
 }
-
-// @ts-ignore
-declare const L: any;
-
-// Helper: group data by city and sum/average energy
-function getCityAggregates(buildings: BuildingData[]) {
-  const cityAgg: Record<string, { lat: number; lng: number; totalEnergy: number; count: number }> = {};
-  buildings.forEach(b => {
-    if (!b.city || !b.lat || !b.lng) return;
-    const city = b.city.trim();
-    const lat = typeof b.lat === "string" ? parseFloat(b.lat) : b.lat;
-    const lng = typeof b.lng === "string" ? parseFloat(b.lng) : b.lng;
-    if (!lat || !lng) return;
-
-    if (!cityAgg[city]) cityAgg[city] = { lat, lng, totalEnergy: 0, count: 0 };
-    cityAgg[city].totalEnergy += Number(b.siteEnergyUseKbtu) || 0;
-    cityAgg[city].count++;
-  });
-  return Object.entries(cityAgg).map(([city, val]) => ({
-    city,
-    lat: val.lat,
-    lng: val.lng,
-    totalEnergy: val.totalEnergy,
-    avgEnergy: val.totalEnergy / val.count,
-    count: val.count,
-  }));
-}
-
-// Helper: color scale (blue=low, red=high)
-function getHeatColor(val: number, min: number, max: number): string {
-  const pct = (val - min) / (max - min || 1);
-  const r = Math.round(60 + 195 * pct);
-  const g = Math.round(170 - 110 * pct);
-  const b = Math.round(250 - 200 * pct);
-  return `rgb(${r},${g},${b})`;
-}
-
-export function renderCaliforniaCityEnergyMap(buildings: BuildingData[], type: 'total' | 'avg' = 'total') {
-  const mapContainer = document.getElementById('city-energy-map');
-  if (!mapContainer) return;
-
-  // Remove previous map if any
-  if ((window as any).leafletMapInstance) {
-    (window as any).leafletMapInstance.remove();
-    (window as any).leafletMapInstance = null;
-  }
-
-  mapContainer.innerHTML = "";
-
-  const cityPoints = getCityAggregates(buildings);
-
-  // Use total or average energy
-  const valueKey = type === 'avg' ? 'avgEnergy' : 'totalEnergy';
-
-  const minVal = Math.min(...cityPoints.map(pt => pt[valueKey]));
-  const maxVal = Math.max(...cityPoints.map(pt => pt[valueKey]));
-
-  // Center on California
-  const map = L.map('city-energy-map').setView([37.5, -119.5], 6);
-  (window as any).leafletMapInstance = map;
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 11,
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
-
-  // Draw large, transparent circles for each city
-  cityPoints.forEach(pt => {
-    L.circle([pt.lat, pt.lng], {
-      radius: 18000 + 22000 * (pt[valueKey] - minVal) / (maxVal - minVal || 1),
-      color: getHeatColor(pt[valueKey], minVal, maxVal),
-      fillColor: getHeatColor(pt[valueKey], minVal, maxVal),
-      fillOpacity: 0.45,
-      weight: 1
-    })
-      .addTo(map)
-      .bindTooltip(
-        `<b>${pt.city}</b><br>
-         <b>Properties:</b> ${pt.count}<br>
-         <b>${type === 'avg' ? 'Avg' : 'Total'} Energy:</b> ${Math.round(pt[valueKey]).toLocaleString()} kBtu`,
-        { direction: "top", offset: [0, -8] }
-      );
-  });
-}
-
-
-
-
-
-
 
 function destroyActiveCharts(): void {
   activeCharts.forEach(chart => {
@@ -770,6 +673,9 @@ function displayVisualization(viewName: string, data?: BuildingData[]) {
         case 'buildingAge':
           renderBuildingAge(dataToUse, vizArea);
           break;
+        case 'efficiencyAnalysis':
+          renderEfficiencyAnalysis(dataToUse, vizArea);
+          break;
         default:
           renderOverviewCharts(dataToUse, vizArea);
       }
@@ -962,6 +868,10 @@ function renderOverviewCharts(data: BuildingData[], vizArea: HTMLElement) {
               }
               return [];
             }
+          },
+          title: {
+            display: true,
+            text: 'Darker shades indicate buildings with renewable energy'
           }
         }
       }
@@ -1407,6 +1317,471 @@ function renderBuildingAge(data: BuildingData[], vizArea: HTMLElement) {
     options: { responsive: true, maintainAspectRatio: false, scales: {x: { ticks: {font: {size:10}}}}}
   });
   generateAndDisplayStory('Building Age Distribution', 'A bar chart showing the distribution of public buildings by their construction decade. "Unknown/Pre-1899" includes properties with year built listed as 1899 (often a placeholder) or 0.', storyContainerId);
+}
+
+function renderEfficiencyAnalysis(data: BuildingData[], vizArea: HTMLElement) {
+  vizArea.innerHTML = '';
+
+  // 1. Energy Intensity Distribution (Energy per Sq Ft)
+  const energyIntensityData = data
+    .filter(d => d.siteEnergyUsedPerSqrFt > 0 && d.siteEnergyUsedPerSqrFt < 1000 && d.propertyGFA > 100)
+    .map(d => d.siteEnergyUsedPerSqrFt);
+
+  const energyIntensityBins: Record<string, number> = {};
+  if (energyIntensityData.length > 0) {
+    const maxIntensity = Math.max(...energyIntensityData);
+    const binSize = Math.ceil(maxIntensity / 15) || 10;
+    
+    energyIntensityData.forEach(intensity => {
+      const binStart = Math.floor(intensity / binSize) * binSize;
+      const binEnd = binStart + binSize - 1;
+      const binLabel = `${binStart}-${binEnd}`;
+      energyIntensityBins[binLabel] = (energyIntensityBins[binLabel] || 0) + 1;
+    });
+  }
+
+  const { vizDiv: energyIntensityVizDiv, canvasId: energyIntensityCanvasId, storyContainerId: energyIntensityStoryId } = 
+    createVisualizationContainer('energyIntensityDistribution', 'Energy Intensity Distribution (kBtu/sq ft)');
+  vizArea.appendChild(energyIntensityVizDiv);
+  
+  renderChart(energyIntensityCanvasId, {
+    type: 'bar',
+    data: {
+      labels: Object.keys(energyIntensityBins),
+      datasets: [{
+        label: 'Number of Properties',
+        data: Object.values(energyIntensityBins),
+        backgroundColor: 'rgba(255, 99, 132, 0.7)',
+        borderColor: 'rgba(255, 99, 132, 1)',
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          title: { display: true, text: 'Energy Intensity (kBtu/sq ft)' },
+          ticks: { maxRotation: 45, font: { size: 9 } }
+        },
+        y: {
+          title: { display: true, text: 'Number of Properties' },
+          beginAtZero: true
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            afterBody: function(context: any) {
+              return 'Lower values indicate more energy-efficient buildings';
+            }
+          }
+        }
+      }
+    }
+  });
+  generateAndDisplayStory('Energy Efficiency Distribution', 'Distribution of energy intensity (kBtu per square foot) across buildings. Lower values indicate more energy-efficient properties.', energyIntensityStoryId);
+
+  // 2. Water Efficiency vs Energy Efficiency Scatter Plot
+  const efficiencyScatterData = data
+    .filter(d => d.waterUsedPerSqrFt > 0 && d.waterUsedPerSqrFt < 100 && 
+               d.siteEnergyUsedPerSqrFt > 0 && d.siteEnergyUsedPerSqrFt < 500)
+    .map(d => ({
+      x: d.waterUsedPerSqrFt,
+      y: d.siteEnergyUsedPerSqrFt,
+      hasRenewable: d.hasRenewable > 0,
+      name: d.propertyName || "Unknown Property",
+      type: d.primaryPropertyType || "Unknown Type",
+      leedCertified: d.leedCertified && d.leedCertified.toLowerCase() !== 'no' && d.leedCertified.toLowerCase() !== 'not applicable'
+    }));
+
+  const { vizDiv: efficiencyScatterVizDiv, canvasId: efficiencyScatterCanvasId, storyContainerId: efficiencyScatterStoryId } = 
+    createVisualizationContainer('efficiencyScatter', 'Water vs Energy Efficiency Analysis');
+  vizArea.appendChild(efficiencyScatterVizDiv);
+
+  renderChart(efficiencyScatterCanvasId, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          label: 'Buildings with Renewable Energy',
+          data: efficiencyScatterData.filter(d => d.hasRenewable),
+          backgroundColor: 'rgba(40, 167, 69, 0.6)',
+          borderColor: 'rgba(40, 167, 69, 1)',
+          pointRadius: 6,
+          pointHoverRadius: 8,
+        },
+        {
+          label: 'LEED Certified Buildings',
+          data: efficiencyScatterData.filter(d => d.leedCertified && !d.hasRenewable),
+          backgroundColor: 'rgba(0, 123, 255, 0.6)',
+          borderColor: 'rgba(0, 123, 255, 1)',
+          pointRadius: 6,
+          pointHoverRadius: 8,
+        },
+        {
+          label: 'Other Buildings',
+          data: efficiencyScatterData.filter(d => !d.hasRenewable && !d.leedCertified),
+          backgroundColor: 'rgba(108, 117, 125, 0.4)',
+          borderColor: 'rgba(108, 117, 125, 1)',
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          title: { display: true, text: 'Water Use per Sq Ft (gallons/sq ft)' },
+          beginAtZero: true
+        },
+        y: {
+          title: { display: true, text: 'Energy Use per Sq Ft (kBtu/sq ft)' },
+          beginAtZero: true
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: function(context: TooltipItem<'scatter'>) {
+              const point = context.raw as any;
+              return [
+                `${point.name}`,
+                `Water: ${point.x.toFixed(2)} gal/sq ft`,
+                `Energy: ${point.y.toFixed(2)} kBtu/sq ft`,
+                `Type: ${point.type}`
+              ];
+            }
+          }
+        },
+        legend: {
+          position: 'top',
+          labels: {
+            usePointStyle: true,
+            padding: 20
+          }
+        }
+      }
+    }
+  });
+  generateAndDisplayStory('Efficiency Correlation Analysis', 'Scatter plot showing the relationship between water and energy efficiency. Buildings with renewable energy and LEED certification are highlighted to identify sustainability leaders.', efficiencyScatterStoryId);
+
+  // 3. Renewable Energy Adoption by Property Type
+  const renewableByType = data.reduce((acc, building) => {
+    const type = building.primaryPropertyType || 'Unknown Type';
+    if (!acc[type]) {
+      acc[type] = { total: 0, withRenewable: 0 };
+    }
+    acc[type].total++;
+    if (building.hasRenewable > 0) {
+      acc[type].withRenewable++;
+    }
+    return acc;
+  }, {} as Record<string, { total: number; withRenewable: number }>);
+
+  const renewableAdoptionData = Object.entries(renewableByType)
+    .filter(([_, stats]) => stats.total >= 5) // Only show types with at least 5 buildings
+    .map(([type, stats]) => ({
+      type,
+      adoptionRate: (stats.withRenewable / stats.total) * 100,
+      total: stats.total,
+      withRenewable: stats.withRenewable
+    }))
+    .sort((a, b) => b.adoptionRate - a.adoptionRate)
+    .slice(0, 12);
+
+  const { vizDiv: renewableAdoptionVizDiv, canvasId: renewableAdoptionCanvasId, storyContainerId: renewableAdoptionStoryId } = 
+    createVisualizationContainer('renewableAdoption', 'Renewable Energy Adoption by Property Type');
+  vizArea.appendChild(renewableAdoptionVizDiv);
+
+  renderChart(renewableAdoptionCanvasId, {
+    type: 'bar',
+    data: {
+      labels: renewableAdoptionData.map(d => d.type.length > 15 ? d.type.substring(0, 15) + '...' : d.type),
+      datasets: [{
+        label: 'Renewable Energy Adoption Rate (%)',
+        data: renewableAdoptionData.map(d => d.adoptionRate),
+        backgroundColor: renewableAdoptionData.map(d => 
+          d.adoptionRate > 50 ? 'rgba(40, 167, 69, 0.8)' : 
+          d.adoptionRate > 25 ? 'rgba(255, 193, 7, 0.8)' : 
+          'rgba(220, 53, 69, 0.6)'
+        ),
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      scales: {
+        x: {
+          title: { display: true, text: 'Adoption Rate (%)' },
+          beginAtZero: true,
+          max: 100
+        },
+        y: {
+          ticks: { font: { size: 10 } }
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            afterBody: function(context: any) {
+              const index = context[0].dataIndex;
+              const data = renewableAdoptionData[index];
+              return [
+                `Buildings with renewable: ${data.withRenewable}`,
+                `Total buildings: ${data.total}`,
+                `Adoption rate: ${data.adoptionRate.toFixed(1)}%`
+              ];
+            }
+          }
+        }
+      }
+    }
+  });
+  generateAndDisplayStory('Renewable Energy Adoption Analysis', 'Percentage of buildings with renewable energy systems by property type. Green bars indicate strong adoption (>50%), yellow shows moderate adoption (25-50%), and red shows low adoption (<25%).', renewableAdoptionStoryId);
+
+  // 4. Top and Bottom Performers in Energy Efficiency
+  const buildingsWithEfficiency = data
+    .filter(d => d.siteEnergyUsedPerSqrFt > 0 && d.propertyGFA > 1000)
+    .sort((a, b) => a.siteEnergyUsedPerSqrFt - b.siteEnergyUsedPerSqrFt);
+
+  const topPerformers = buildingsWithEfficiency.slice(0, 10);
+  const bottomPerformers = buildingsWithEfficiency.slice(-10).reverse();
+
+  const { vizDiv: performersVizDiv, canvasId: performersCanvasId, storyContainerId: performersStoryId } = 
+    createVisualizationContainer('efficiencyPerformers', 'Energy Efficiency Leaders vs Laggards');
+  vizArea.appendChild(performersVizDiv);
+
+  renderChart(performersCanvasId, {
+    type: 'bar',
+    data: {
+      labels: [
+        ...topPerformers.map(d => `${(d.propertyName || 'Unknown').substring(0, 20)}... (EFFICIENT)`),
+        ...bottomPerformers.map(d => `${(d.propertyName || 'Unknown').substring(0, 20)}... (INEFFICIENT)`)
+      ],
+      datasets: [{
+        label: 'Energy Use per Sq Ft (kBtu/sq ft)',
+        data: [
+          ...topPerformers.map(d => d.siteEnergyUsedPerSqrFt),
+          ...bottomPerformers.map(d => d.siteEnergyUsedPerSqrFt)
+        ],
+        backgroundColor: [
+          ...topPerformers.map(() => 'rgba(40, 167, 69, 0.7)'),
+          ...bottomPerformers.map(() => 'rgba(220, 53, 69, 0.7)')
+        ],
+        borderColor: [
+          ...topPerformers.map(() => 'rgba(40, 167, 69, 1)'),
+          ...bottomPerformers.map(() => 'rgba(220, 53, 69, 1)')
+        ],
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      scales: {
+        x: {
+          title: { display: true, text: 'Energy Use per Sq Ft (kBtu/sq ft)' },
+          beginAtZero: true
+        },
+        y: {
+          ticks: { font: { size: 8 } }
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            afterBody: function(context: any) {
+              const index = context[0].dataIndex;
+              const building = index < 10 ? topPerformers[index] : bottomPerformers[index - 10];
+              return [
+                `Department: ${building.departmentName || 'N/A'}`,
+                `Property Type: ${building.primaryPropertyType || 'N/A'}`,
+                `GFA: ${building.propertyGFA.toLocaleString()} sq ft`,
+                building.hasRenewable > 0 ? '✓ Has Renewable Energy' : '✗ No Renewable Energy'
+              ];
+            }
+          }
+        }
+      }
+    }
+  });
+  generateAndDisplayStory('Energy Efficiency Benchmarking', 'Comparison of the most and least energy-efficient buildings (minimum 1,000 sq ft). Green bars show the top 10 most efficient buildings, red bars show the 10 least efficient buildings.', performersStoryId);
+
+  // 5. Efficiency Summary Matrix
+  const efficiencyMatrix = data
+    .filter(d => d.siteEnergyUsedPerSqrFt > 0 && d.waterUsedPerSqrFt > 0 && d.propertyGFA > 500)
+    .map(d => {
+      // Categorize efficiency levels
+      const energyEfficiencyLevel = d.siteEnergyUsedPerSqrFt < 50 ? 'High' : 
+                                   d.siteEnergyUsedPerSqrFt < 100 ? 'Medium' : 'Low';
+      const waterEfficiencyLevel = d.waterUsedPerSqrFt < 10 ? 'High' : 
+                                  d.waterUsedPerSqrFt < 25 ? 'Medium' : 'Low';
+      return {
+        building: d,
+        energyLevel: energyEfficiencyLevel,
+        waterLevel: waterEfficiencyLevel,
+        category: `${energyEfficiencyLevel} Energy / ${waterEfficiencyLevel} Water`
+      };
+    });
+
+  const matrixCounts = efficiencyMatrix.reduce((acc, item) => {
+    acc[item.category] = (acc[item.category] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const { vizDiv: matrixVizDiv, canvasId: matrixCanvasId, storyContainerId: matrixStoryId } = 
+    createVisualizationContainer('efficiencyMatrix', 'Building Efficiency Classification Matrix');
+  vizArea.appendChild(matrixVizDiv);
+
+  const matrixLabels = Object.keys(matrixCounts);
+  const matrixValues = Object.values(matrixCounts);
+
+  renderChart(matrixCanvasId, {
+    type: 'doughnut',
+    data: {
+      labels: matrixLabels,
+      datasets: [{
+        data: matrixValues,
+        backgroundColor: [
+          'rgba(40, 167, 69, 0.8)',   // High/High
+          'rgba(255, 193, 7, 0.8)',   // High/Medium or Medium/High
+          'rgba(255, 193, 7, 0.6)',   // Medium/Medium
+          'rgba(255, 99, 132, 0.8)',  // Low efficiency combinations
+          'rgba(255, 99, 132, 0.6)',
+          'rgba(220, 53, 69, 0.8)',
+          'rgba(220, 53, 69, 0.6)',
+          'rgba(108, 117, 125, 0.6)',
+          'rgba(108, 117, 125, 0.4)'
+        ],
+        borderWidth: 2,
+        borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: function(context: any) {
+              const total = matrixValues.reduce((a, b) => a + b, 0);
+              const percentage = ((context.parsed / total) * 100).toFixed(1);
+              return `${context.label}: ${context.parsed} buildings (${percentage}%)`;
+            }
+          }
+        },
+        legend: {
+          position: 'bottom',
+          labels: {
+            padding: 15,
+            usePointStyle: true,
+            font: { size: 10 }
+          }
+        }
+      }
+    }
+  });
+  generateAndDisplayStory('Efficiency Classification', 'Buildings categorized by their energy and water efficiency levels. This matrix helps identify buildings that excel in both areas (green) versus those needing improvement (red).', matrixStoryId);
+
+  // 6. Electrical Efficiency Analysis
+  const electricalEfficiencyData = data
+    .filter(d => d.elecUsedPerSqrFt > 0 && d.elecUsedPerSqrFt < 200 && d.propertyGFA > 500)
+    .map(d => ({
+      name: d.propertyName || "Unknown Property",
+      department: d.departmentName || "Unknown Dept",
+      type: d.primaryPropertyType || "Unknown Type",
+      electricalIntensity: d.elecUsedPerSqrFt,
+      hasRenewable: d.hasRenewable > 0,
+      greenPowerPercent: d.percentGreenPower || 0,
+      yearBuilt: d.yearBuilt,
+      gfa: d.propertyGFA
+    }))
+    .sort((a, b) => a.electricalIntensity - b.electricalIntensity);
+
+  // Get top and bottom electrical performers
+  const topElectricalPerformers = electricalEfficiencyData.slice(0, 15);
+  const bottomElectricalPerformers = electricalEfficiencyData.slice(-15).reverse();
+
+  const { vizDiv: electricalVizDiv, canvasId: electricalCanvasId, storyContainerId: electricalStoryId } = 
+    createVisualizationContainer('electricalEfficiency', 'Electrical Efficiency Analysis (kWh/sq ft)');
+  vizArea.appendChild(electricalVizDiv);
+
+  renderChart(electricalCanvasId, {
+    type: 'bar',
+    data: {
+      labels: [
+        ...topElectricalPerformers.map(d => `${d.name.substring(0, 15)}... (BEST)`),
+        ...bottomElectricalPerformers.map(d => `${d.name.substring(0, 15)}... (WORST)`)
+      ],
+      datasets: [{
+        label: 'Electrical Use per Sq Ft (kWh/sq ft)',
+        data: [
+          ...topElectricalPerformers.map(d => d.electricalIntensity),
+          ...bottomElectricalPerformers.map(d => d.electricalIntensity)
+        ],
+        backgroundColor: [
+          ...topElectricalPerformers.map(d => d.hasRenewable ? 'rgba(40, 167, 69, 0.8)' : 'rgba(40, 167, 69, 0.6)'),
+          ...bottomElectricalPerformers.map(d => d.hasRenewable ? 'rgba(220, 53, 69, 0.8)' : 'rgba(220, 53, 69, 0.6)')
+        ],
+        borderColor: [
+          ...topElectricalPerformers.map(d => d.hasRenewable ? 'rgba(40, 167, 69, 1)' : 'rgba(40, 167, 69, 0.8)'),
+          ...bottomElectricalPerformers.map(d => d.hasRenewable ? 'rgba(220, 53, 69, 1)' : 'rgba(220, 53, 69, 0.8)')
+        ],
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      scales: {
+        x: {
+          title: { display: true, text: 'Electrical Use per Sq Ft (kWh/sq ft)' },
+          beginAtZero: true
+        },
+        y: {
+          ticks: { font: { size: 8 } }
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            afterBody: function(context: any) {
+              const index = context[0].dataIndex;
+              const building = index < 15 ? topElectricalPerformers[index] : bottomElectricalPerformers[index - 15];
+              return [
+                `Department: ${building.department}`,
+                `Property Type: ${building.type}`,
+                `GFA: ${building.gfa.toLocaleString()} sq ft`,
+                `Green Power: ${building.greenPowerPercent.toFixed(1)}%`,
+                `Year Built: ${building.yearBuilt || 'Unknown'}`,
+                building.hasRenewable ? '✓ Has Renewable Energy' : '✗ No Renewable Energy'
+              ];
+            }
+          }
+        },
+        legend: {
+          position: 'top',
+          labels: {
+            usePointStyle: true,
+            padding: 20,
+            font: { size: 11 }
+          },
+          title: {
+            display: true,
+            text: 'Darker shades indicate buildings with renewable energy'
+          }
+        }
+      }
+    }
+  });
+  generateAndDisplayStory('Electrical Efficiency Leaders and Laggards', 'Analysis of electrical consumption per square foot. The top 15 most efficient (green) and 15 least efficient (red) buildings are shown. Darker shades indicate buildings with renewable energy systems.', electricalStoryId);
 }
 
 // Enhanced filtering and data processing functions
