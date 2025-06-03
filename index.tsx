@@ -1588,74 +1588,7 @@ energyLogToggle.addEventListener('change', function () {
   });
   generateAndDisplayStory('Renewable Energy Adoption Analysis', 'Percentage of buildings with renewable energy systems by property type. Green bars indicate strong adoption (>50%), yellow shows moderate adoption (25-50%), and red shows low adoption (<25%).', renewableAdoptionStoryId);
 
-  // 4. Top and Bottom Performers in Energy Efficiency
-  const buildingsWithEfficiency = data
-    .filter(d => d.siteEnergyUsedPerSqrFt > 0 && d.propertyGFA > 1000)
-    .sort((a, b) => a.siteEnergyUsedPerSqrFt - b.siteEnergyUsedPerSqrFt);
-
-  const topPerformers = buildingsWithEfficiency.slice(0, 10);
-  const bottomPerformers = buildingsWithEfficiency.slice(-10).reverse();
-
-  const { vizDiv: performersVizDiv, canvasId: performersCanvasId, storyContainerId: performersStoryId } = 
-    createVisualizationContainer('efficiencyPerformers', 'Energy Efficiency Leaders vs Laggards');
-  vizArea.appendChild(performersVizDiv);
-
-  renderChart(performersCanvasId, {
-    type: 'bar',
-    data: {
-      labels: [
-        ...topPerformers.map(d => `${(d.propertyName || 'Unknown').substring(0, 20)}... (EFFICIENT)`),
-        ...bottomPerformers.map(d => `${(d.propertyName || 'Unknown').substring(0, 20)}... (INEFFICIENT)`)
-      ],
-      datasets: [{
-        label: 'Energy Use per Sq Ft (kBtu/sq ft)',
-        data: [
-          ...topPerformers.map(d => d.siteEnergyUsedPerSqrFt),
-          ...bottomPerformers.map(d => d.siteEnergyUsedPerSqrFt)
-        ],
-        backgroundColor: [
-          ...topPerformers.map(() => 'rgba(40, 167, 69, 0.7)'),
-          ...bottomPerformers.map(() => 'rgba(220, 53, 69, 0.7)')
-        ],
-        borderColor: [
-          ...topPerformers.map(() => 'rgba(40, 167, 69, 1)'),
-          ...bottomPerformers.map(() => 'rgba(220, 53, 69, 1)')
-        ],
-        borderWidth: 1,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      indexAxis: 'y',
-      scales: {
-        x: {
-          title: { display: true, text: 'Energy Use per Sq Ft (kBtu/sq ft)' },
-          beginAtZero: true
-        },
-        y: {
-          ticks: { font: { size: 8 } }
-        }
-      },
-      plugins: {
-        tooltip: {
-          callbacks: {
-            afterBody: function(context: any) {
-              const index = context[0].dataIndex;
-              const building = index < 10 ? topPerformers[index] : bottomPerformers[index - 10];
-              return [
-                `Department: ${building.departmentName || 'N/A'}`,
-                `Property Type: ${building.primaryPropertyType || 'N/A'}`,
-                `GFA: ${building.propertyGFA.toLocaleString()} sq ft`,
-                building.hasRenewable > 0 ? '✓ Has Renewable Energy' : '✗ No Renewable Energy'
-              ];
-            }
-          }
-        }
-      }
-    }
-  });
-  generateAndDisplayStory('Energy Efficiency Benchmarking', 'Comparison of the most and least energy-efficient buildings (minimum 1,000 sq ft). Green bars show the top 10 most efficient buildings, red bars show the 10 least efficient buildings.', performersStoryId);
+  
 
   // 5. Efficiency Summary Matrix
   const efficiencyMatrix = data
@@ -1733,99 +1666,7 @@ energyLogToggle.addEventListener('change', function () {
   });
   generateAndDisplayStory('Efficiency Classification', 'Buildings categorized by their energy and water efficiency levels. This matrix helps identify buildings that excel in both areas (green) versus those needing improvement (red).', matrixStoryId);
 
-  // 6. Electrical Efficiency Analysis
-  const electricalEfficiencyData = data
-    .filter(d => d.elecUsedPerSqrFt > 0 && d.elecUsedPerSqrFt < 200 && d.propertyGFA > 500)
-    .map(d => ({
-      name: d.propertyName || "Unknown Property",
-      department: d.departmentName || "Unknown Dept",
-      type: d.primaryPropertyType || "Unknown Type",
-      electricalIntensity: d.elecUsedPerSqrFt,
-      hasRenewable: d.hasRenewable > 0,
-      greenPowerPercent: d.percentGreenPower || 0,
-      yearBuilt: d.yearBuilt,
-      gfa: d.propertyGFA
-    }))
-    .sort((a, b) => a.electricalIntensity - b.electricalIntensity);
-
-  // Get top and bottom electrical performers
-  const topElectricalPerformers = electricalEfficiencyData.slice(0, 15);
-  const bottomElectricalPerformers = electricalEfficiencyData.slice(-15).reverse();
-
-  const { vizDiv: electricalVizDiv, canvasId: electricalCanvasId, storyContainerId: electricalStoryId } = 
-    createVisualizationContainer('electricalEfficiency', 'Electrical Efficiency Analysis (kWh/sq ft)');
-  vizArea.appendChild(electricalVizDiv);
-
-  renderChart(electricalCanvasId, {
-    type: 'bar',
-    data: {
-      labels: [
-        ...topElectricalPerformers.map(d => `${d.name.substring(0, 15)}... (BEST)`),
-        ...bottomElectricalPerformers.map(d => `${d.name.substring(0, 15)}... (WORST)`)
-      ],
-      datasets: [{
-        label: 'Electrical Use per Sq Ft (kWh/sq ft)',
-        data: [
-          ...topElectricalPerformers.map(d => d.electricalIntensity),
-          ...bottomElectricalPerformers.map(d => d.electricalIntensity)
-        ],
-        backgroundColor: [
-          ...topElectricalPerformers.map(d => d.hasRenewable ? 'rgba(40, 167, 69, 0.8)' : 'rgba(40, 167, 69, 0.6)'),
-          ...bottomElectricalPerformers.map(d => d.hasRenewable ? 'rgba(220, 53, 69, 0.8)' : 'rgba(220, 53, 69, 0.6)')
-        ],
-        borderColor: [
-          ...topElectricalPerformers.map(d => d.hasRenewable ? 'rgba(40, 167, 69, 1)' : 'rgba(40, 167, 69, 0.8)'),
-          ...bottomElectricalPerformers.map(d => d.hasRenewable ? 'rgba(220, 53, 69, 1)' : 'rgba(220, 53, 69, 0.8)')
-        ],
-        borderWidth: 2,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      indexAxis: 'y',
-      scales: {
-        x: {
-          title: { display: true, text: 'Electrical Use per Sq Ft (kWh/sq ft)' },
-          beginAtZero: true
-        },
-        y: {
-          ticks: { font: { size: 8 } }
-        }
-      },
-      plugins: {
-        tooltip: {
-          callbacks: {
-            afterBody: function(context: any) {
-              const index = context[0].dataIndex;
-              const building = index < 15 ? topElectricalPerformers[index] : bottomElectricalPerformers[index - 15];
-              return [
-                `Department: ${building.department}`,
-                `Property Type: ${building.type}`,
-                `GFA: ${building.gfa.toLocaleString()} sq ft`,
-                `Green Power: ${building.greenPowerPercent.toFixed(1)}%`,
-                `Year Built: ${building.yearBuilt || 'Unknown'}`,
-                building.hasRenewable ? '✓ Has Renewable Energy' : '✗ No Renewable Energy'
-              ];
-            }
-          }
-        },
-        legend: {
-          position: 'top',
-          labels: {
-            usePointStyle: true,
-            padding: 20,
-            font: { size: 11 }
-          },
-          title: {
-            display: true,
-            text: 'Darker shades indicate buildings with renewable energy'
-          }
-        }
-      }
-    }
-  });
-  generateAndDisplayStory('Electrical Efficiency Leaders and Laggards', 'Analysis of electrical consumption per square foot. The top 15 most efficient (green) and 15 least efficient (red) buildings are shown. Darker shades indicate buildings with renewable energy systems.', electricalStoryId);
+  
 }
 
 // Enhanced filtering and data processing functions
@@ -2292,7 +2133,7 @@ document.addEventListener('click', (e) => {
   document.getElementById('zoom-reset')?.addEventListener('click', resetZoom);
   document.getElementById('screenshot-btn')?.addEventListener('click', takeScreenshot);
   document.getElementById('show-animations')?.addEventListener('change', toggleAnimations);
-  document.getElementById('dark-mode')?.addEventListener('change', toggleDarkMode);
+  // document.getElementById('dark-mode')?.addEventListener('change', toggleDarkMode);
   
   // Modal controls
   document.addEventListener('click', (e) => {
