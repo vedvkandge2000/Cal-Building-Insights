@@ -1064,25 +1064,84 @@ function renderGreenPowerCharts(data: BuildingData[], vizArea: HTMLElement) {
     }
   });
   
-  const { vizDiv: greenPctVizDiv, canvasId: greenPctCanvasId, storyContainerId: greenPctStoryId } = createVisualizationContainer('greenPowerDistribution', 'Green Power Usage Distribution');
-  vizArea.appendChild(greenPctVizDiv);
-  renderChart(greenPctCanvasId, {
-    type: 'bar',
-    data: {
-      labels: Object.keys(greenPowerBins),
-      datasets: [{
-        label: 'Number of Properties',
-        data: Object.values(greenPowerBins),
-        backgroundColor: (context: TooltipItem<'bar'>[] | any) => { // Added TooltipItem<ChartType>[] to satisfy Chart.js type, use any for simplicity
-            const label = context.chart.data.labels![context.dataIndex] as string;
-            if(label === '0% Usage') return 'rgba(220, 53, 69, 0.7)'; 
-            if(label === 'Not Reported/Applicable') return 'rgba(108, 117, 125, 0.7)';
-            return 'rgba(40, 167, 69, 0.7)';
-        },
-      }]
+  const { vizDiv: greenPctVizDiv, canvasId: greenPctCanvasId, storyContainerId: greenPctStoryId } =
+  createVisualizationContainer('greenPowerDistribution', 'Green Power Usage Distribution');
+vizArea.appendChild(greenPctVizDiv);
+
+// --- Create Logarithmic toggle, add above chart ---
+const logToggleDiv = document.createElement('div');
+logToggleDiv.style.margin = '0.5rem 0';
+
+const logToggle = document.createElement('input');
+logToggle.type = 'checkbox';
+logToggle.id = 'logToggle';
+
+const logLabel = document.createElement('label');
+logLabel.htmlFor = 'logToggle';
+logLabel.style.marginLeft = '0.25rem';
+logLabel.innerText = 'Logarithmic Y-Axis';
+
+logToggleDiv.appendChild(logToggle);
+logToggleDiv.appendChild(logLabel);
+greenPctVizDiv.prepend(logToggleDiv);
+
+// --- Chart.js config object (reuse for toggling) ---
+const greenPowerConfig: ChartConfiguration<'bar'> = {
+  type: 'bar',
+  data: {
+    labels: Object.keys(greenPowerBins),
+    datasets: [{
+      label: 'Number of Properties',
+      data: Object.values(greenPowerBins),
+      backgroundColor: (context: any) => {
+        const label = context.chart.data.labels[context.dataIndex] as string;
+        if (label === '0% Usage') return 'rgba(220, 53, 69, 0.7)';
+        if (label === 'Not Reported/Applicable') return 'rgba(108, 117, 125, 0.7)';
+        return 'rgba(40, 167, 69, 0.7)';
+      },
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      tooltip: { displayColors: false }
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { displayColors: false }}}
-  });
+    scales: {
+      y: {
+        type: 'linear',
+        min: 1,
+        title: {
+          display: true,
+          text: 'Number of Properties'
+        },
+        ticks: {
+          callback: function(value: string | number) {
+            // Typescript-friendly tick formatting
+            if (typeof value === 'number') {
+              return value.toLocaleString();
+            }
+            return value;
+          }
+        }
+      }
+    }
+  }
+};
+
+// --- 2. Render the chart (ensure renderChart returns Chart instance) ---
+const myChart = renderChart(greenPctCanvasId, greenPowerConfig);
+
+// --- 3. Toggle handler (just use logToggle, no redeclaration) ---
+logToggle.addEventListener('change', function (e) {
+  // e.target always HTMLInputElement in this context
+  if (!myChart.options.scales || !myChart.options.scales.y) return;
+  const isLog = logToggle.checked;
+  myChart.options.scales.y.type = isLog ? 'logarithmic' : 'linear';
+  myChart.options.scales.y.min = isLog ? 1 : 0;
+  myChart.update();
+});
+
   generateAndDisplayStory('Green Power Adoption', 'Distribution of properties by green power usage. "0% Usage" indicates properties using grid electricity but no reported green power. "Not Reported/Applicable" includes properties with non-standard green power data.', greenPctStoryId);
 
   const leedCounts: Record<string, number> = { 'Certified': 0, 'Not Certified': 0 };
@@ -1137,20 +1196,112 @@ function renderWaterUsageCharts(data: BuildingData[], vizArea: HTMLElement) {
   }
 
 
-  const { vizDiv: waterHistVizDiv, canvasId: waterHistCanvasId, storyContainerId: waterHistStoryId } = createVisualizationContainer('waterUsageDistribution', 'Water Usage Distribution (kgal)');
-  vizArea.appendChild(waterHistVizDiv);
-  renderChart(waterHistCanvasId, {
-    type: 'bar',
-    data: {
-      labels: Object.keys(waterBins),
-      datasets: [{
-        label: 'Number of Properties',
-        data: Object.values(waterBins),
-        backgroundColor: 'rgba(23, 162, 184, 0.7)',
-      }]
-    },
-    options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { autoSkip: false, maxRotation: 45, minRotation: 45, font: {size: 9} } } } }
-  });
+  const { vizDiv: waterHistVizDiv, canvasId: waterHistCanvasId, storyContainerId: waterHistStoryId } =
+  createVisualizationContainer('waterUsageDistribution', 'Water Usage Distribution (kgal)');
+vizArea.appendChild(waterHistVizDiv);
+
+// --- Create Logarithmic toggle, add above chart ---
+const waterLogToggleDiv = document.createElement('div');
+waterLogToggleDiv.style.margin = '0.5rem 0';
+
+const waterLogToggle = document.createElement('input');
+waterLogToggle.type = 'checkbox';
+waterLogToggle.id = 'waterLogToggle';
+
+const waterLogLabel = document.createElement('label');
+waterLogLabel.htmlFor = 'waterLogToggle';
+waterLogLabel.style.marginLeft = '0.25rem';
+waterLogLabel.innerText = 'Logarithmic Y-Axis';
+
+waterLogToggleDiv.appendChild(waterLogToggle);
+waterLogToggleDiv.appendChild(waterLogLabel);
+waterHistVizDiv.prepend(waterLogToggleDiv);
+
+// --- Chart.js config object (reuse for toggling) ---
+const waterUsageConfig: ChartConfiguration<'bar'> = {
+  type: 'bar',
+  data: {
+    labels: Object.keys(waterBins),
+    datasets: [{
+      label: 'Number of Properties',
+      data: Object.values(waterBins),
+      backgroundColor: 'rgba(23, 162, 184, 0.7)',
+      borderColor: 'rgba(0,0,0,0.7)', // Black border for every bar
+      borderWidth: 0,
+      barPercentage: 0.8,
+      categoryPercentage: 0.8,
+      // The below makes sure Chart.js doesn't skip borders for tiny values
+      borderSkipped: false,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        ticks: {
+          autoSkip: false,
+          maxRotation: 45,
+          minRotation: 45,
+          font: { size: 9 }
+        }
+      },
+      y: {
+        type: 'linear',
+        min: 1,
+        title: {
+          display: true,
+          text: 'Number of Properties'
+        },
+        ticks: {
+          callback: function(value: string | number) {
+            if (typeof value === 'number') {
+              return value.toLocaleString();
+            }
+            return value;
+          }
+        }
+      }
+    }
+  },
+  // This plugin forcibly draws a small bar even for value 1 (optional, advanced)
+  plugins: [{
+    id: 'minBarHeight',
+    afterDatasetDraw(chart, args, options) {
+      const { ctx, chartArea: area } = chart;
+      const dataset = chart.getDatasetMeta(0);
+      dataset.data.forEach((bar, i) => {
+        const value = chart.data.datasets[0].data[i];
+        if (value === 1 && chart.options.scales && chart.options.scales.y && chart.options.scales.y.type === 'logarithmic') {
+          // Draw a tiny filled rect for visibility if needed
+          ctx.save();
+          ctx.fillStyle = 'rgba(0,0,0,0.3)';
+          const barElement = bar as any;
+          const barWidth = barElement.width;
+          const barX = barElement.x - barElement.width / 2;
+          const barY = barElement.y - 2;
+          
+          ctx.fillRect(barX, barY, barWidth, 2);
+          ctx.restore();
+        }
+      });
+    }
+  }]
+};
+
+// --- 2. Render the chart (ensure renderChart returns Chart.js instance) ---
+const waterChart = renderChart(waterHistCanvasId, waterUsageConfig);
+
+// --- 3. Toggle handler (no redeclaration!) ---
+waterLogToggle.addEventListener('change', function () {
+  if (!waterChart.options.scales || !waterChart.options.scales.y) return;
+  const isLog = waterLogToggle.checked;
+  waterChart.options.scales.y.type = isLog ? 'logarithmic' : 'linear';
+  waterChart.options.scales.y.min = isLog ? 1 : 0;
+  waterChart.update();
+});
+
+
   generateAndDisplayStory('Water Usage Distribution', chartDescriptionWaterDist, waterHistStoryId);
 
 
