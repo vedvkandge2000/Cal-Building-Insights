@@ -429,6 +429,71 @@ header h1 {
 }
 
 /* Filters Panel */
+/* Filter Group Box Enhancement */
+.filter-group {
+  background: #ffffff;
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  margin-bottom: 1.5rem;
+  transition: transform 0.2s ease;
+}
+
+.filter-group:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Refine input + label layout */
+.filter-group input[type="text"],
+.filter-group input[type="number"],
+.filter-group select {
+  font-size: 0.95rem;
+  padding: 0.5rem 0.75rem;
+}
+
+/* Label alignment with icon */
+.filter-group label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Section Header */
+#navigation-panel h2 {
+  font-size: 1.4rem;
+  color: var(--primary-color);
+  font-weight: 700;
+  margin-bottom: 2rem;
+}
+
+/* Better spacing for Apply / Reset */
+.filters-footer {
+  gap: 1rem;
+}
+
+.filters-footer button {
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+/* Search bar polish */
+.filter-search input {
+  border-radius: 6px;
+  padding: 0.6rem 1rem;
+  font-size: 0.95rem;
+}
+
+/* Dropdown hover polish */
+.filter-group select:hover,
+.filter-group input[type="text"]:hover,
+.filter-group input[type="number"]:hover {
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
 .filters-panel {
   position: fixed;
   left: 0;
@@ -442,6 +507,7 @@ header h1 {
   transform: translateX(-100%);
   transition: transform 0.3s ease;
   overflow-y: auto;
+  align-items: center;
 }
 
 .filters-panel:not(.collapsed) {

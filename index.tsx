@@ -519,9 +519,6 @@ function showBuildingDetailsModal(building: BuildingData): void {
           </div>
         </div>
         <div class="building-actions">
-          <button class="btn-primary" onclick="addToComparison('${building.propertyId}'); this.closest('.modal-overlay').remove();">
-            <i class="fas fa-plus"></i> Add to Comparison
-          </button>
           <button class="btn-secondary" onclick="filterSimilarBuildings('${building.primaryPropertyType}'); this.closest('.modal-overlay').remove();">
             <i class="fas fa-search"></i> Find Similar Buildings
           </button>
@@ -530,6 +527,10 @@ function showBuildingDetailsModal(building: BuildingData): void {
     </div>
   `;
   
+          // ##########  ADD this Later !!!!!! ##########
+          //   <button class="btn-primary" onclick="addToComparison('${building.propertyId}'); this.closest('.modal-overlay').remove();">
+          //   <i class="fas fa-plus"></i> Add to Comparison
+          // </button>
   document.body.appendChild(modal);
   
   modal.querySelector('.modal-close')?.addEventListener('click', () => {
@@ -703,13 +704,15 @@ function renderOverviewCharts(data: BuildingData[], vizArea: HTMLElement) {
   const { vizDiv: deptVizDiv, canvasId: deptCanvasId, storyContainerId: deptStoryId } = createVisualizationContainer('deptDistribution', 'Properties by Department (Top 15) - Click to Filter');
   vizArea.appendChild(deptVizDiv);
   
+  //Compare Button:  (########### ADD THIS LATER !!!!!!!! #############)
+  // <button class="btn-sm" onclick="toggleComparisonMode()">Toggle Compare Mode</button>
+
   // Add interactive elements to container
   const interactiveControls = document.createElement('div');
   interactiveControls.className = 'chart-controls';
   interactiveControls.innerHTML = `
     <div class="control-group">
       <button class="btn-sm" onclick="resetDepartmentFilter()">Reset Filter</button>
-      <button class="btn-sm" onclick="toggleComparisonMode()">Toggle Compare Mode</button>
       <button class="btn-sm" onclick="exportChartData('departments')">Export Data</button>
     </div>
     <div class="chart-info">
@@ -2303,18 +2306,16 @@ document.addEventListener('click', (e) => {
   document.getElementById('confirm-export')?.addEventListener('click', handleExport);
   
   // Comparison panel
-  document.getElementById('close-comparison')?.addEventListener('click', () => {
-    document.getElementById('comparison-panel')?.classList.add('collapsed');
-  });
+  // document.getElementById('close-comparison')?.addEventListener('click', () => {
+  //   document.getElementById('comparison-panel')?.classList.add('collapsed');
+  // });
   
   // Comparison panel buttons
-  document.getElementById('compare-buildings')?.addEventListener('click', () => {
-    (window as any).compareSelectedBuildings();
-  });
+
   
-  document.getElementById('clear-comparison')?.addEventListener('click', () => {
-    (window as any).clearAllComparison();
-  });
+  // document.getElementById('clear-comparison')?.addEventListener('click', () => {
+  //   (window as any).clearAllComparison();
+  // });
   
   // Add universal reset button in header
   const headerControls = document.querySelector('.header-controls');
@@ -2527,10 +2528,10 @@ function toggleAnimations(e: Event): void {
   showNotification(`Animations ${enabled ? 'enabled' : 'disabled'}`, 'info');
 }
 
-function toggleDarkMode(e: Event): void {
-  const enabled = (e.target as HTMLInputElement).checked;
-  document.body.classList.toggle('dark-mode', enabled);
-}
+// function toggleDarkMode(e: Event): void {
+//   const enabled = (e.target as HTMLInputElement).checked;
+//   document.body.classList.toggle('dark-mode', enabled);
+// }
 
 function handleExport(): void {
   const formatRadio = document.querySelector('input[name="export-format"]:checked') as HTMLInputElement;
