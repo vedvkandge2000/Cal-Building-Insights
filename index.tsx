@@ -8,7 +8,7 @@ import zoomPlugin from 'chartjs-plugin-zoom';
 import { MatrixController, MatrixElement } from 'chartjs-chart-matrix';
 Chart.register(...registerables, zoomPlugin, MatrixController, MatrixElement);
 
-const API_KEY = '';
+const API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL_NAME = "gemini-2.5-flash-preview-04-17";
 
 // Enhanced interfaces for interactivity
@@ -98,7 +98,7 @@ function getNumericValue(value: string | number | undefined): number {
 
 async function fetchDataAndParse(): Promise<BuildingData[]> {
   try {
-    const response = await fetch('dataUpdated.json'); 
+    const response = await fetch('/dataUpdated.json'); 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
