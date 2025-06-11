@@ -85,6 +85,17 @@ let chartInteractionState: ChartInteractionState = {
   showPercentages: true
 };
 
+let filterState: FilterState = {
+  departments: [],
+  propertyTypes: [],
+  yearRange: [0, 2024],
+  energyRange: [0, 1000000],
+  gfaRange: [0, 1000000],
+  leedCertified: null,
+  searchTerm: '',
+  selectedCity: null
+};
+
 function getNumericValue(value: string | number | undefined): number {
   if (value === undefined || value === null) return 0;
   if (typeof value === 'number') return isNaN(value) ? 0 : value;
@@ -584,12 +595,108 @@ chartContainer.innerHTML = `
   return { vizDiv, canvasId, storyContainerId };
 }
 
+function getVisualizationContext(chartId: string, data: BuildingData[]): string {
+  const context: string[] = [];
+  
+  // Get current filter state
+  if (filterState.departments.length > 0) {
+    context.push(`Filtered by departments: ${filterState.departments.join(', ')}`);
+  }
+  if (filterState.propertyTypes.length > 0) {
+    context.push(`Filtered by property types: ${filterState.propertyTypes.join(', ')}`);
+  }
+  if (filterState.selectedCity) {
+    context.push(`Filtered by city: ${filterState.selectedCity}`);
+  }
+  if (filterState.yearRange[0] > 0 || filterState.yearRange[1] < 2024) {
+    context.push(`Year range: ${filterState.yearRange[0]}-${filterState.yearRange[1]}`);
+  }
+  
+  // Get detailed data statistics
+  const totalBuildings = data.length;
+  const avgEnergyUse = data.reduce((sum, b) => sum + b.siteEnergyUseKbtu, 0) / totalBuildings;
+  const avgWaterUse = data.reduce((sum, b) => sum + b.waterUseKgal, 0) / totalBuildings;
+  const avgGFA = data.reduce((sum, b) => sum + b.propertyGFA, 0) / totalBuildings;
+  
+  // Calculate efficiency metrics
+  const avgEnergyIntensity = data.reduce((sum, b) => sum + b.siteEnergyUsedPerSqrFt, 0) / totalBuildings;
+  const avgWaterIntensity = data.reduce((sum, b) => sum + b.waterUsedPerSqrFt, 0) / totalBuildings;
+  
+  // Calculate renewable energy adoption
+  const buildingsWithRenewable = data.filter(b => b.hasRenewable > 0).length;
+  const renewableAdoptionRate = (buildingsWithRenewable / totalBuildings) * 100;
+  
+  // Calculate LEED certification rate
+  const leedCertified = data.filter(b => b.leedCertified && b.leedCertified.toLowerCase() !== 'no' && b.leedCertified.toLowerCase() !== 'not applicable').length;
+  const leedCertificationRate = (leedCertified / totalBuildings) * 100;
+  
+  context.push(`Total buildings in view: ${totalBuildings}`);
+  context.push(`Average building size: ${Math.round(avgGFA).toLocaleString()} sq ft`);
+  context.push(`Average energy use: ${Math.round(avgEnergyUse).toLocaleString()} kBtu`);
+  context.push(`Average water use: ${Math.round(avgWaterUse).toLocaleString()} kgal`);
+  context.push(`Average energy intensity: ${avgEnergyIntensity.toFixed(2)} kBtu/sq ft`);
+  context.push(`Average water intensity: ${avgWaterIntensity.toFixed(2)} kgal/sq ft`);
+  context.push(`Renewable energy adoption: ${renewableAdoptionRate.toFixed(1)}% of buildings`);
+  context.push(`LEED certification rate: ${leedCertificationRate.toFixed(1)}% of buildings`);
+  
+  // Get chart-specific context with enhanced analysis
+  const chart = Chart.getChart(chartId);
+  if (chart) {
+    const chartType = (chart as any).config.type;
+    const datasets = chart.data.datasets;
+    const labels = chart.data.labels;
+    
+    if (chartType === 'bar' || chartType === 'line') {
+      const values = datasets[0].data as number[];
+      const maxValue = Math.max(...values);
+      const minValue = Math.min(...values);
+      const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
+      const stdDev = Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - avgValue, 2), 0) / values.length);
+      
+      context.push(`Chart type: ${chartType}`);
+      context.push(`Value range: ${minValue.toLocaleString()} - ${maxValue.toLocaleString()}`);
+      context.push(`Average value: ${Math.round(avgValue).toLocaleString()}`);
+      context.push(`Standard deviation: ${Math.round(stdDev).toLocaleString()}`);
+      
+      // Identify outliers
+      const outliers = values.filter(v => Math.abs(v - avgValue) > 2 * stdDev);
+      if (outliers.length > 0) {
+        context.push(`Found ${outliers.length} potential outliers`);
+      }
+    } else if (chartType === 'scatter') {
+      const points = datasets[0].data as {x: number, y: number}[];
+      const xValues = points.map(p => p.x);
+      const yValues = points.map(p => p.y);
+      
+      const xRange = [Math.min(...xValues), Math.max(...xValues)];
+      const yRange = [Math.min(...yValues), Math.max(...yValues)];
+      const xAvg = xValues.reduce((a, b) => a + b, 0) / xValues.length;
+      const yAvg = yValues.reduce((a, b) => a + b, 0) / yValues.length;
+      
+      // Calculate correlation coefficient
+      const xMean = xValues.reduce((a, b) => a + b, 0) / xValues.length;
+      const yMean = yValues.reduce((a, b) => a + b, 0) / yValues.length;
+      const correlation = points.reduce((sum, p) => {
+        return sum + ((p.x - xMean) * (p.y - yMean));
+      }, 0) / (Math.sqrt(points.reduce((sum, p) => sum + Math.pow(p.x - xMean, 2), 0)) * 
+               Math.sqrt(points.reduce((sum, p) => sum + Math.pow(p.y - yMean, 2), 0)));
+      
+      context.push(`X-axis range: ${xRange[0].toLocaleString()} - ${xRange[1].toLocaleString()}`);
+      context.push(`Y-axis range: ${yRange[0].toLocaleString()} - ${yRange[1].toLocaleString()}`);
+      context.push(`Average X value: ${Math.round(xAvg).toLocaleString()}`);
+      context.push(`Average Y value: ${Math.round(yAvg).toLocaleString()}`);
+      context.push(`Correlation coefficient: ${correlation.toFixed(2)}`);
+    }
+  }
+  
+  return context.join('. ');
+}
 
 async function generateAndDisplayStory(visualizationTitle: string, chartDescription: string, storyContainerId: string) {
   const storyContainer = document.getElementById(storyContainerId);
   if (!storyContainer) {
-      console.warn(`Story container ${storyContainerId} not found.`);
-      return;
+    console.warn(`Story container ${storyContainerId} not found.`);
+    return;
   }
 
   const loader = storyContainer.querySelector('.story-loader') as HTMLElement;
@@ -601,7 +708,6 @@ async function generateAndDisplayStory(visualizationTitle: string, chartDescript
   const existingError = storyContainer.querySelector('.error-message');
   if (existingError) existingError.remove();
 
-
   if (!API_KEY) {
     storyContainer.innerHTML = `<p class="error-message">API key not configured. Story generation disabled.</p>`;
     if (loader) loader.style.display = 'none';
@@ -612,7 +718,19 @@ async function generateAndDisplayStory(visualizationTitle: string, chartDescript
     ai = new GoogleGenAI({ apiKey: API_KEY });
   }
 
-  const prompt = `You are a data storyteller for an app about California public buildings. Provide a concise, insightful narrative (2-3 sentences, max 100 words) for a visualization titled "${visualizationTitle}". This visualization shows: ${chartDescription}. Highlight a key takeaway or interesting pattern for a general audience. Avoid jargon.`;
+  // Get the chart ID from the story container ID
+  const chartId = storyContainerId.replace('story-', 'chart-');
+  const visualizationContext = getVisualizationContext(chartId, filteredBuildingData);
+
+  const prompt = `You are a data storyteller for an app about California public buildings. Provide a detailed, insightful narrative (3-4 sentences, max 150 words) for a visualization titled "${visualizationTitle}". This visualization shows: ${chartDescription}. Current context: ${visualizationContext}. 
+
+Please provide insights in the following structure:
+1. Main observation: What is the most significant pattern or trend in the current view?
+2. Comparative analysis: How do these values compare to typical ranges or benchmarks?
+3. Implications: What do these patterns suggest about building performance or efficiency?
+4. Recommendations: What actions or further analysis might be warranted?
+
+Make the insights specific to the current filtered data and avoid jargon. Highlight any notable outliers or unusual patterns and keep the text format simple.`;
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -621,7 +739,17 @@ async function generateAndDisplayStory(visualizationTitle: string, chartDescript
     });
     const story = response.text;
     const storyP = document.createElement('p');
-    storyP.textContent = story ?? '';
+    
+    // Strip markdown formatting from the response
+    const cleanStory = story
+      ?.replace(/\*\*/g, '') // Remove bold markers
+      ?.replace(/\*/g, '')   // Remove italic markers
+      ?.replace(/#{1,6}\s/g, '') // Remove heading markers
+      ?.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Convert markdown links to just text
+      ?.replace(/`([^`]+)`/g, '$1') // Remove code formatting
+      ?.replace(/\n/g, ' '); // Replace newlines with spaces
+    
+    storyP.textContent = cleanStory ?? '';
     if (loader) loader.style.display = 'none'; // Hide loader before adding text
     storyContainer.appendChild(storyP);
 
